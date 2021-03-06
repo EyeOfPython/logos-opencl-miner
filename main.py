@@ -5,7 +5,6 @@ from typing import Callable, Any
 
 import numpy as np
 import pyopencl as cl
-import os
 import hashlib
 
 mf = cl.mem_flags
@@ -152,6 +151,12 @@ bench_cases = [
         nonces_per_batch=0x100_0000,
         inner_iterations=1,
         kernel_name='miner-midstate-3',
+    ),
+    BenchCase(
+        kernel=KernelMidstate3,
+        nonces_per_batch=0x100_0000,
+        inner_iterations=1,
+        kernel_name='miner-midstate-4',
     ),
 ]
 
