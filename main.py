@@ -75,6 +75,44 @@ class KernelMidstate2(BenchKernel):
                          offset, header_g, self.pre_pow_layer_0, self.pre_pow_layer_1, output_g)
 
 
+class KernelMidstate3(BenchKernel):
+    def __init__(self, ctx, queue, prg) -> None:
+        self.ctx = ctx
+        self.queue = queue
+        self.search_hash = prg.search_hash
+        self.search_hash.set_scalar_arg_dtypes([
+            np.uint32,
+            None,
+            np.uint32, np.uint32,
+            np.uint32, np.uint32, np.uint32, np.uint32, np.uint32, np.uint32, np.uint32,
+            None,
+        ])
+        self.compute_pre_pow_layer = prg.compute_pre_pow_layer
+        self.compute_pre_chain_layer = prg.compute_pre_chain_layer
+        self.pre_pow_layer_0 = 0
+        self.pre_pow_layer_1 = 0
+        self.pre_chain_layer = []
+
+    def prepare_header(self, header_g) -> None:
+        pre_layer_g = cl.Buffer(self.ctx, mf.WRITE_ONLY, 28)
+        pre_layer_h = np.zeros(7, np.uint32)
+        self.compute_pre_pow_layer(self.queue, (1,), None, header_g, pre_layer_g)
+        cl.enqueue_copy(self.queue, pre_layer_h, pre_layer_g)
+        self.pre_pow_layer_0 = pre_layer_h[0]
+        self.pre_pow_layer_1 = pre_layer_h[1]
+        self.compute_pre_chain_layer(self.queue, (1,), None, header_g, pre_layer_g)
+        cl.enqueue_copy(self.queue, pre_layer_h, pre_layer_g)
+        self.pre_chain_layer = list(pre_layer_h)
+
+    def run(self, batch_size, offset, header_g, output_g) -> None:
+        args = list(self.pre_chain_layer)
+        args.append(output_g)
+        self.search_hash(self.queue, (batch_size,), None,
+                         offset, header_g,
+                         self.pre_pow_layer_0, self.pre_pow_layer_1,
+                         *args)
+
+
 @dataclass
 class BenchCase:
     kernel: Callable[[Any, Any, Any], BenchKernel]
@@ -109,6 +147,12 @@ bench_cases = [
         inner_iterations=1,
         kernel_name='miner-midstate-2',
     ),
+    BenchCase(
+        kernel=KernelMidstate3,
+        nonces_per_batch=0x100_0000,
+        inner_iterations=1,
+        kernel_name='miner-midstate-3',
+    ),
 ]
 
 
@@ -129,6 +173,13 @@ def run_bench():
     header_g = cl.Buffer(ctx, mf.READ_ONLY, 80)
     output_g = cl.Buffer(ctx, mf.WRITE_ONLY, 256)
     cl.enqueue_copy(queue, header_g, header_h)
+
+    pow_layer = bytearray.fromhex("""\
+                ffff001d\
+                2fb142600000\
+                000000000000\
+                ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\
+                """)
 
     batches_share = 16
     for bench_case in bench_cases:
@@ -158,13 +209,6 @@ def run_bench():
             if output_h[0]:
                 nonce = offset + int.from_bytes(output_h[4:8], 'little')
                 print('found nonce:', nonce)
-
-                pow_layer = bytearray.fromhex("""\
-                ffff001d\
-                2fb142600000\
-                000000000000\
-                ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad\
-                """)
 
                 pow_layer[12:16] = nonce.to_bytes(4, 'big')
                 chain_layer = bytes(32) + hashlib.sha256(pow_layer).digest()
