@@ -125,14 +125,14 @@ bench_cases = [
     BenchCase(
         kernel=SimpleKernel,
         nonces_per_batch=0x100_0000,
-        inner_iterations=16,
-        kernel_name='miner-loop16',
+        inner_iterations=1,
+        kernel_name='miner-naive',
     ),
     BenchCase(
         kernel=SimpleKernel,
         nonces_per_batch=0x100_0000,
-        inner_iterations=1,
-        kernel_name='miner-naive',
+        inner_iterations=16,
+        kernel_name='miner-loop16',
     ),
     BenchCase(
         kernel=SimpleKernel,
@@ -141,16 +141,34 @@ bench_cases = [
         kernel_name='miner-midstate-1',
     ),
     BenchCase(
+        kernel=SimpleKernel,
+        nonces_per_batch=0x100_0000,
+        inner_iterations=16,
+        kernel_name='miner-midstate-1-loop16',
+    ),
+    BenchCase(
         kernel=KernelMidstate2,
         nonces_per_batch=0x100_0000,
         inner_iterations=1,
         kernel_name='miner-midstate-2',
     ),
     BenchCase(
+        kernel=KernelMidstate2,
+        nonces_per_batch=0x100_0000,
+        inner_iterations=16,
+        kernel_name='miner-midstate-2-loop16',
+    ),
+    BenchCase(
         kernel=KernelMidstate3,
         nonces_per_batch=0x100_0000,
         inner_iterations=1,
         kernel_name='miner-midstate-3',
+    ),
+    BenchCase(
+        kernel=KernelMidstate3,
+        nonces_per_batch=0x100_0000,
+        inner_iterations=16,
+        kernel_name='miner-midstate-3-loop16',
     ),
     BenchCase(
         kernel=KernelMidstate3,
@@ -188,6 +206,7 @@ def run_bench():
 
     batches_share = 16
     for bench_case in bench_cases:
+        print('running', bench_case)
         prg = cl.Program(ctx, open(f"kernels/{bench_case.kernel_name}.cl").read()).build()
         kernel = bench_case.kernel(ctx, queue, prg)
         kernel.prepare_header(header_g)
