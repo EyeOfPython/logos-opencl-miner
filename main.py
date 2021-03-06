@@ -43,6 +43,11 @@ bench_cases = [
         inner_iterations=1,
         kernel_name='miner-naive',
     ),
+    BenchCase(
+        nonces_per_batch=0x100_0000,
+        inner_iterations=1,
+        kernel_name='miner-midstate-1',
+    ),
 ]
 
 
@@ -65,6 +70,8 @@ header_g = cl.Buffer(ctx, mf.READ_ONLY, 80)
 output_g = cl.Buffer(ctx, mf.WRITE_ONLY, 200)
 cl.enqueue_copy(queue, header_g, header_h)
 
+
+batches_share = 1
 for bench_case in bench_cases:
     prg = cl.Program(ctx, open(f"kernels/{bench_case.kernel_name}.cl").read()).build()
     search_hash = prg.search_hash
@@ -74,7 +81,7 @@ for bench_case in bench_cases:
     nonce_size = 0x1_0000_0000
     batch_size = bench_case.nonces_per_batch // bench_case.inner_iterations
     inner_iterations = 16
-    num_batches = nonce_size // bench_case.nonces_per_batch
+    num_batches = nonce_size // bench_case.nonces_per_batch // batches_share
     for batch in range(num_batches):
         output_h = bytearray(200)
 
