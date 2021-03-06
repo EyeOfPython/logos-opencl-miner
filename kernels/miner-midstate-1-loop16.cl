@@ -146,15 +146,15 @@ __kernel void search_hash(
         pow_layer[i + 12] = POW_LAYER_PAD[i];
     }
 
-    for (uint iteration = 0; iteration < 16; ++iteration) {
-        pow_layer[3] = offset + get_global_id(0) * 16 + iteration;
+    for (uint iteration = 0; iteration < ITERATIONS; ++iteration) {
+        pow_layer[3] = offset + get_global_id(0) * ITERATIONS + iteration;
 
         sha256_pow_layer(pow_layer, &chain_layer[8]);
         sha256_chain_layer(chain_layer, hash);
         
         if (hash[0] == 0) {
             output[0] = 1;
-            output[1] = get_global_id(0) * 16 + iteration;
+            output[1] = get_global_id(0) * ITERATIONS + iteration;
         }
     }
 }
